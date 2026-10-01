@@ -1,0 +1,4 @@
+auction.db
+auction.db-*
+test.db*
+node_modules/
