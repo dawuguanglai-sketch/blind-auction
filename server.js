@@ -99,28 +99,72 @@ setInterval(settleEnded, 1000);
 
 // ---------- layout ----------
 const CSS = `
-:root{--bg:#f6f4ef;--fg:#1d1b18;--mut:#6f6a60;--card:#fff;--acc:#d6336c;--acc2:#1c3d5a;--bd:#e2ddd2}
-*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,"Hiragino Sans","Yu Gothic",sans-serif;background:var(--bg);color:var(--fg)}
-a{color:var(--acc2)}header{background:var(--acc2);color:#fff;padding:.6rem 1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
-header a{color:#fff;text-decoration:none}header .logo{font-weight:800;font-size:1.2rem}header form{display:flex;gap:.3rem;margin-left:auto}
-main{max-width:1000px;margin:0 auto;padding:1rem}
-.hero{background:linear-gradient(135deg,#1c3d5a,#5b2a6b);color:#fff;border-radius:16px;padding:2.5rem 1.5rem;text-align:center;margin-bottom:1.5rem}
-.hero h1{font-size:2rem;margin:.2rem}.hero p{opacity:.9}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;display:block}
-.card img{width:100%;aspect-ratio:1;object-fit:cover;background:#ddd;display:block}.card .b{padding:.7rem}
-.card h3{font-size:.95rem;margin:0 0 .4rem}.meta{font-size:.85rem;color:var(--mut)}
-.timer{font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums}.timer.big{font-size:2rem}
-.btn,button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:.6rem 1.2rem;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
-button.sec,.btn.sec{background:#fff;color:var(--fg);border:1px solid var(--bd)}button:disabled{background:#aaa}
-form.f label{display:block;margin:.8rem 0 .2rem;font-weight:600}
-input,select,textarea{width:100%;padding:.55rem;border:1px solid var(--bd);border-radius:8px;font:inherit;background:#fff}
-header input{width:auto}.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:1rem;margin-bottom:1rem}
-.detail{display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem}@media(max-width:720px){.detail{grid-template-columns:1fr}}
-.detail img{width:100%;border-radius:12px}.err{background:#fde8e8;color:#8a1c1c;padding:.7rem;border-radius:8px;margin-bottom:1rem}
-.ok{background:#e4f4e4;color:#1d5c1d;padding:.7rem;border-radius:8px;margin-bottom:1rem}
-.win{font-size:1.4rem;font-weight:800;color:#b8860b}table{width:100%;border-collapse:collapse}td,th{padding:.4rem;border-bottom:1px solid var(--bd);text-align:left}
-.sorts a{margin-right:.8rem}.warn{background:#fff7e0;border:1px solid #f0d890;border-radius:8px;padding:.8rem 1.4rem}
+:root{--paper:#f4ecdc;--paper2:#ebe0c8;--ink:#17130f;--mut:#6b6254;--card:#fffaf0;--seal:#d4301a;--indigo:#23386b;--gold:#c8962e;--bd:#17130f;
+--serif:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN",serif;--sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.7 var(--sans);background:var(--paper);color:var(--ink);
+background-image:radial-gradient(rgba(23,19,15,.06) 1px,transparent 1px);background-size:14px 14px}
+a{color:var(--indigo)}a:hover{color:var(--seal)}
+h1,h2,h3{font-family:var(--serif);font-weight:800;letter-spacing:.02em}
+.top{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:3px solid var(--ink);padding:.6rem 1.2rem;display:flex;gap:1.2rem;align-items:center;flex-wrap:wrap}
+.top a{color:var(--ink);text-decoration:none}
+.logo{font-family:var(--serif);font-weight:800;font-size:1.7rem;letter-spacing:.08em;display:flex;align-items:center;gap:.5rem}
+.logo i{font-style:normal;background:var(--seal);color:#fff;width:2rem;height:2rem;display:grid;place-items:center;font-size:1.15rem;border-radius:3px;transform:rotate(-6deg);box-shadow:2px 2px 0 var(--ink)}
+.sbar{display:flex;flex:1;min-width:220px;max-width:520px;border:2px solid var(--ink);background:var(--card);box-shadow:3px 3px 0 var(--ink)}
+.sbar select{width:auto;border:0;border-right:2px solid var(--ink);background:var(--paper2);padding:.4rem;font-size:.85rem}
+.sbar input{border:0;flex:1;min-width:0;background:transparent}.sbar button{border:0;border-radius:0;background:var(--ink);color:var(--paper);box-shadow:none;padding:.4rem 1rem}
+.acts{margin-left:auto;display:flex;gap:1.1rem;align-items:center;font-weight:700;font-size:.9rem;white-space:nowrap}
+.acts a:hover{color:var(--seal)}.acts .cta{background:var(--seal);color:#fff;padding:.35rem 1rem;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.sub{display:flex;gap:.5rem;overflow-x:auto;white-space:nowrap;padding:.6rem 1.2rem;max-width:1280px;margin:0 auto}
+.sub a{text-decoration:none;color:var(--ink);font-size:.85rem;padding:.1rem .8rem;border:1.5px solid var(--ink);border-radius:99px;background:var(--card)}
+.sub a:hover{background:var(--ink);color:var(--paper)}
+main{max-width:1280px;margin:0 auto;padding:.5rem 1.2rem 1.5rem}
+.hero{position:relative;overflow:hidden;background:var(--ink);color:var(--paper);padding:3rem 2rem;margin-bottom:1.5rem;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--seal)}
+.hero h1{font-size:clamp(2rem,5vw,3.4rem);margin:0 0 .5rem;line-height:1.25}.hero h1 em{font-style:normal;color:var(--seal);background:var(--paper);padding:0 .3em}
+.hero p{margin:0 0 1.2rem;opacity:.85;max-width:32em}
+.hero:after{content:"一発";position:absolute;right:-1rem;bottom:-2.5rem;font:800 11rem/1 var(--serif);color:rgba(244,236,220,.07);pointer-events:none}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;counter-reset:s}
+.steps div{border:2px dashed var(--ink);padding:.8rem 1rem;background:var(--card)}.steps b{font-family:var(--serif);font-size:1.05rem;display:block}
+.steps div:before{counter-increment:s;content:counter(s);display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;border-radius:50%;background:var(--seal);color:#fff;font-weight:800;margin-right:.4rem}
+.sec{margin-bottom:2rem}.sec h2{margin:0 0 .8rem;font-size:1.5rem;display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px double var(--ink);padding-bottom:.3rem}
+.sec h2 a{font-family:var(--sans);font-size:.85rem;font-weight:400}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1.1rem}
+.card{background:var(--card);border:2px solid var(--ink);text-decoration:none;color:var(--ink);display:block;position:relative;box-shadow:4px 4px 0 var(--ink);transition:transform .12s,box-shadow .12s}
+.card:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 var(--seal);color:var(--ink)}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--paper2);display:block;border-bottom:2px solid var(--ink)}.card .b{padding:.7rem .8rem}
+.card h3{font-family:var(--sans);font-size:.95rem;font-weight:700;margin:0 0 .4rem;height:2.7em;overflow:hidden;line-height:1.4}
+.price{font-family:var(--serif);font-size:1.3rem;font-weight:800}.price small{font-family:var(--sans);font-size:.72rem;font-weight:400;color:var(--mut);margin-right:.2rem}
+.meta{font-size:.8rem;color:var(--mut)}
+.tag{display:inline-block;font-size:.7rem;font-weight:700;padding:0 .5rem;border:1.5px solid var(--seal);color:var(--seal);border-radius:2px;letter-spacing:.05em}
+.tag.blind{background:var(--seal);color:#fff}.tag.end{border-color:var(--mut);color:var(--mut)}
+.timer{font-family:var(--serif);font-weight:800;color:var(--seal);font-variant-numeric:tabular-nums}.timer.big{font-size:2.4rem;line-height:1.1}
+.btn,button{background:var(--card);color:var(--ink);border:2px solid var(--ink);border-radius:2px;padding:.45rem 1.2rem;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;box-shadow:3px 3px 0 var(--ink)}
+.btn:hover,button:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--ink);color:var(--ink)}
+.hero .btn{background:var(--seal);color:#fff;border-color:var(--paper);box-shadow:3px 3px 0 var(--paper)}.hero .btn:hover{color:#fff}
+button.buy{background:var(--seal);color:#fff;width:100%;padding:.8rem;font-size:1.1rem;font-family:var(--serif);letter-spacing:.1em}
+button.sec,.btn.sec{background:var(--card)}button:disabled{background:var(--paper2);color:var(--mut);box-shadow:none;cursor:default;border-color:var(--mut)}
+form.f label{display:block;margin:.8rem 0 .2rem;font-weight:700}
+input,select,textarea{width:100%;padding:.5rem;border:2px solid var(--ink);border-radius:2px;font:inherit;background:var(--card)}
+input:focus,select:focus,textarea:focus{outline:3px solid var(--gold);outline-offset:0}
+.panel{background:var(--card);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:1.2rem;margin-bottom:1.2rem}
+.crumb{font-size:.8rem;color:var(--mut);margin:.3rem 0 .8rem}.crumb a{color:var(--mut)}
+.detail{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.8rem;margin-bottom:1.5rem;align-items:start}
+@media(max-width:820px){.detail{grid-template-columns:1fr}}
+.detail img{width:100%;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--paper2);object-fit:cover;max-height:560px}
+.detail h1{font-size:1.8rem;margin:0 0 .4rem;line-height:1.35}
+.buybox{border:3px solid var(--ink);background:var(--card);padding:1.2rem;margin:1rem 0;position:relative;box-shadow:6px 6px 0 var(--seal)}
+.buybox:before{content:"入札札";position:absolute;top:-.85rem;left:1rem;background:var(--ink);color:var(--paper);font-family:var(--serif);padding:0 .8rem;letter-spacing:.2em}
+.info td,.info th{padding:.4rem .5rem;border-bottom:1px dashed var(--mut);text-align:left;vertical-align:top}.info th{width:8em;font-weight:700;color:var(--mut)}
+.err{background:#fde9e5;border:2px solid var(--seal);color:#8e1d0e;padding:.7rem 1rem;margin:.5rem 0 1rem;font-weight:700}
+.ok{background:#e8f1e1;border:2px solid #3b6b27;color:#2b5019;padding:.7rem 1rem;margin:.5rem 0 1rem;font-weight:700}
+.win{font-family:var(--serif);font-size:1.7rem;font-weight:800;color:var(--seal)}
+table{width:100%;border-collapse:collapse}td,th{padding:.45rem;border-bottom:1px solid var(--paper2);text-align:left}
+.layout{display:grid;grid-template-columns:230px 1fr;gap:1.4rem}@media(max-width:800px){.layout{grid-template-columns:1fr}}
+.side{background:var(--card);border:2px solid var(--ink);padding:1rem;align-self:start}.side h4{margin:1rem 0 .3rem;font-family:var(--serif);border-bottom:2px solid var(--ink)}.side h4:first-child{margin-top:0}
+.side a{display:block;text-decoration:none;padding:.1rem 0;color:var(--ink)}.side a.on{font-weight:800;color:var(--seal)}.side a.on:before{content:"▶ "}
+.sorts{display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;gap:1rem;flex-wrap:wrap}.sorts select{width:auto}
+.warn{background:#fff3d6;border:2px dashed var(--gold);padding:.8rem 1.4rem}
+footer{border-top:3px solid var(--ink);background:var(--ink);color:var(--paper);text-align:center;padding:1.6rem;font-family:var(--serif);letter-spacing:.1em;margin-top:2rem}
 `;
 const JS = `
 function tick(){document.querySelectorAll('[data-end]').forEach(function(e){
@@ -132,12 +176,17 @@ tick();setInterval(tick,1000);`;
 function page(user, title, body, opts = {}) {
   const unread = user ? one('SELECT COUNT(*) c FROM notifications WHERE user_id=?', user.id).c : 0;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} | 一発入札</title><style>${CSS}</style></head><body>
-<header><a class="logo" href="/">🔨 一発入札</a><a href="/search">商品を探す</a>
-${user ? `<a href="/sell">出品する</a><a href="/mypage">マイページ${unread ? ` (🔔${unread})` : ''}</a><a href="/logout">ログアウト(${esc(user.username)})</a>`
-      : '<a href="/login">ログイン</a><a href="/register">会員登録</a>'}
-<form action="/search"><input name="q" placeholder="商品名・ブランド・キーワード"><button>検索</button></form></header>
-<main>${opts.flash ? `<div class="${opts.flashType || 'err'}">${esc(opts.flash)}</div>` : ''}${body}</main><script>${JS}</script></body></html>`;
+<title>${esc(title)} | 一発入札</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>${CSS}</style></head><body>
+<div class="top"><a class="logo" href="/"><i>札</i>一発入札</a>
+<form class="sbar" action="/search"><select name="category"><option value="">すべて</option>${CATEGORIES.map((c) => `<option>${c}</option>`).join('')}</select><input name="q" placeholder="さがす…"><button>検索</button></form>
+<div class="acts">${user ? `<a href="/mypage">${esc(user.username)}${unread ? ` 🔔${unread}` : ''}</a><a href="/logout">ログアウト</a><a class="cta" href="/sell">出品する</a>`
+      : '<a href="/login">ログイン</a><a class="cta" href="/register">会員登録</a>'}</div></div>
+<nav class="sub"><a href="/search?sort=ending">⏰ 終了間近</a><a href="/search?sort=new">新着</a><a href="/search?sort=bidders">人気</a>${CATEGORIES.map((c) => `<a href="/search?category=${encodeURIComponent(c)}">${c}</a>`).join('')}<a href="/search?ended=1">落札結果</a></nav>
+<main>${opts.flash ? `<div class="${opts.flashType || 'err'}">${esc(opts.flash)}</div>` : ''}${body}</main>
+<footer>見えない価格、ただ一度の入札。</footer><script>${JS}</script></body></html>`;
 }
 
 const timer = (end, reload) => `<span class="timer" data-end="${end}"${reload ? ' data-reload="1"' : ''}></span>`;
@@ -152,8 +201,9 @@ function card(p) {
   // ※ 現在価格は意図的に表示しない (§19)
   const st = statusOf(p);
   return `<a class="card" href="/auction/${p.id}"><img src="${esc(p.image_url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-<div class="b"><h3>${esc(p.title)}</h3><div class="meta">開始価格 ${yen(p.start_price)}<br>入札者 ${bidderCount(p.id)}人<br>
-${st === 'live' ? '残り ' + timer(p.end_at) : st === 'scheduled' ? '開始前' : '終了'}</div></div></a>`;
+<div class="b"><h3>${esc(p.title)}</h3><div class="price"><small>開始価格</small> ${yen(p.start_price)}</div>
+<div class="meta"><span class="tag blind">🔒 封印中</span> ${bidderCount(p.id)}人が入札</div>
+<div class="meta">${st === 'live' ? '残り ' + timer(p.end_at) : st === 'scheduled' ? '開始前' : '<span class="tag end">終了</span>'}</div></div></a>`;
 }
 
 // ---------- request plumbing ----------
@@ -184,12 +234,13 @@ const route = (method, re, fn) => routes.push({ method, re, fn });
 route('GET', /^\/$/, ({ user }) => {
   const live = "status='active' AND start_at<=? AND end_at>?";
   const t = now();
-  const sec = (title, rows) => `<h2>${title}</h2>` + (rows.length ? `<div class="grid">${rows.map(card).join('')}</div>` : '<p class="meta">該当する商品はありません。</p>');
-  const body = `<div class="hero"><h1>あなたはいくらだと思う？</h1><p>他人の価格は見えない。<br>最後まで誰が勝つか分からない。</p><a class="btn" href="/search">商品を探す</a></div>
-${sec('⏰ 終了間近', all(`SELECT * FROM products WHERE ${live} ORDER BY end_at ASC LIMIT 4`, t, t))}
-${sec('🆕 新着商品', all(`SELECT * FROM products WHERE ${live} ORDER BY created_at DESC LIMIT 4`, t, t))}
-${sec('🔥 人気商品', all(`SELECT p.* FROM products p WHERE p.status='active' AND p.start_at<=? AND p.end_at>? ORDER BY (SELECT COUNT(*) FROM bids b WHERE b.auction_id=p.id) DESC LIMIT 4`, t, t))}
-<h2>カテゴリー</h2><p>${CATEGORIES.map((c) => `<a class="btn sec" href="/search?category=${encodeURIComponent(c)}">${c}</a> `).join('')}</p>`;
+  const sec = (title, rows, href) => `<div class="sec"><h2>${title}<a href="${href}">もっと見る ›</a></h2>` + (rows.length ? `<div class="grid">${rows.map(card).join('')}</div>` : '<p class="meta">該当する商品はありません。</p>') + '</div>';
+  const body = `<div class="hero"><h1>あなたは、<br><em>いくら</em>だと思う？</h1><p>他人の価格は見えない。競り上げもない。最後まで誰が勝つか分からない、ただ一度きりの入札。</p><a class="btn" href="/search">商品を探す</a></div>
+<div class="steps"><div><b>商品を見る</b>現在価格は非公開</div><div><b>自分の価値で決める</b>払ってもいい金額を考える</div><div><b>一度だけ入札</b>変更も再入札もなし</div><div><b>最高額が落札</b>終了時刻に自動で決定</div></div>
+${sec('⏰ 終了間近のオークション', all(`SELECT * FROM products WHERE ${live} ORDER BY end_at ASC LIMIT 6`, t, t), '/search?sort=ending')}
+${sec('🆕 新着商品', all(`SELECT * FROM products WHERE ${live} ORDER BY created_at DESC LIMIT 6`, t, t), '/search?sort=new')}
+${sec('🔥 人気商品(入札者数順)', all(`SELECT p.* FROM products p WHERE p.status='active' AND p.start_at<=? AND p.end_at>? ORDER BY (SELECT COUNT(*) FROM bids b WHERE b.auction_id=p.id) DESC LIMIT 6`, t, t), '/search?sort=bidders')}
+<div class="sec"><h2>カテゴリから探す</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">${CATEGORIES.map((c) => `<a class="btn sec" style="border-radius:4px;text-align:center" href="/search?category=${encodeURIComponent(c)}">${c}</a>`).join('')}</div></div>`;
   return page(user, 'トップ', body);
 });
 
@@ -210,16 +261,16 @@ route('GET', /^\/search$/, ({ user, query }) => {
   };
   const sk = sorts[query.sort] ? query.sort : 'new';
   const rows = all(`SELECT * FROM products WHERE ${w.join(' AND ')} ORDER BY ${sorts[sk][1]} LIMIT 100`, ...p);
-  const keep = (o) => '/search?' + new URLSearchParams({ ...query, ...o }).toString();
-  const body = `<h1>商品を探す</h1><form class="panel f" action="/search">
-<input name="q" placeholder="キーワード" value="${esc(query.q)}">
-<select name="category"><option value="">カテゴリ: すべて</option>${CATEGORIES.map((c) => `<option ${query.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
-<select name="condition"><option value="">状態: すべて</option>${CONDITIONS.map((c) => `<option ${query.condition === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
-<input name="min" type="number" placeholder="開始価格 下限" value="${esc(query.min)}"><input name="max" type="number" placeholder="開始価格 上限" value="${esc(query.max)}">
-<label><input type="checkbox" name="ended" value="1" style="width:auto" ${query.ended === '1' ? 'checked' : ''}> 終了したオークション</label>
-<input type="hidden" name="sort" value="${sk}"><button>絞り込む</button></form>
-<p class="sorts">${Object.entries(sorts).map(([k, v]) => k === sk ? `<b>${v[0]}</b>` : `<a href="${esc(keep({ sort: k }))}">${v[0]}</a>`).join('')}</p>
-${rows.length ? `<div class="grid">${rows.map(card).join('')}</div>` : '<p>該当する商品がありません。</p>'}`;
+  const link = (o) => '/search?' + new URLSearchParams(Object.fromEntries(Object.entries({ ...query, ...o }).filter(([, v]) => v))).toString();
+  const body = `<div class="layout"><aside class="side"><form action="/search">
+<h4>カテゴリ</h4><a class="${query.category ? '' : 'on'}" href="${esc(link({ category: '' }))}">すべて</a>${CATEGORIES.map((c) => `<a class="${query.category === c ? 'on' : ''}" href="${esc(link({ category: c }))}">${c}</a>`).join('')}
+<h4>商品の状態</h4><select name="condition"><option value="">すべて</option>${CONDITIONS.map((c) => `<option ${query.condition === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+<h4>開始価格</h4><input name="min" type="number" placeholder="下限(円)" value="${esc(query.min)}"><p></p><input name="max" type="number" placeholder="上限(円)" value="${esc(query.max)}">
+<h4>状態</h4><label><input type="checkbox" name="ended" value="1" style="width:auto" ${query.ended === '1' ? 'checked' : ''}> 終了したオークション</label>
+<input type="hidden" name="q" value="${esc(query.q)}"><input type="hidden" name="category" value="${esc(query.category)}"><input type="hidden" name="sort" value="${sk}"><p></p><button>絞り込む</button></form></aside>
+<section><div class="sec"><div class="sorts"><span><b>${rows.length}件</b>${query.q ? ` 「${esc(query.q)}」の検索結果` : ''}</span>
+<span>並び替え: <select onchange="location=this.value">${Object.entries(sorts).map(([k, v]) => `<option value="${esc(link({ sort: k }))}" ${k === sk ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></span></div>
+${rows.length ? `<div class="grid">${rows.map(card).join('')}</div>` : '<p>該当する商品がありません。</p>'}</div></section></div>`;
   return page(user, '商品検索', body);
 });
 
@@ -248,21 +299,24 @@ ${user && (isWin || user.id === p.seller_id) ? `<a class="btn" href="/transactio
   } else if (user.id === p.seller_id) {
     box = '<p class="meta">あなたの出品商品です(入札できません)。</p>';
   } else if (mine) {
-    box = `<div class="panel"><p><b>あなたはこの商品に入札済みです。</b></p><p>あなたの入札額<br><span class="win">${yen(mine.amount)}</span></p>
+    box = `<div><p><b>あなたはこの商品に入札済みです。</b></p><p>あなたの入札額<br><span class="win">${yen(mine.amount)}</span></p>
 <p class="meta">※入札額の変更はできません。終了までお待ちください。<br>現在の順位: 非公開 / 他の入札額: 非公開</p><button disabled>入札済み</button></div>`;
   } else {
     box = `<p>あなたの入札: 未入札</p><form action="/auction/${p.id}/confirm" method="post" class="f">
 <label>あなたがこの商品に払ってもいい金額(円)</label><input name="amount" type="number" min="${p.start_price}" step="1" required placeholder="${p.start_price}以上">
-<p></p><button>入札する</button></form>`;
+<p></p><button class="buy">一発入札する</button></form>`;
   }
-  return `<div class="detail"><div><img src="${esc(p.image_url)}" alt="" onerror="this.style.display='none'"></div><div>
-<h1>${esc(p.title)}</h1><p class="meta">${esc(p.category)} / ${esc(p.item_condition)}${p.brand ? ' / ' + esc(p.brand) : ''} / 出品者: ${esc(seller.username)}</p>
-<div class="panel"><p>開始価格: <b>${yen(p.start_price)}</b></p>
-${st === 'ended' ? '' : '<p>現在の入札価格: <b>非公開</b></p>'}<p>入札者数: <b>${n}人</b></p>
-<p>終了日時: ${fmtDate(p.end_at)}</p>${st === 'live' ? `<p>残り時間<br>${timer(p.end_at, true).replace('class="timer"', 'class="timer big"')}</p>` : ''}</div>
-<div class="panel">${box}</div></div></div>
-<div class="panel"><h3>商品説明</h3><p>${esc(p.description).replace(/\n/g, '<br>')}</p>
-<p class="meta">発送方法: ${esc(p.shipping_method)} / 発送元: ${esc(p.ship_from)} / 送料: ${esc(p.shipping_payer)}</p></div>`;
+  return `<div class="crumb"><a href="/">トップ</a> › <a href="/search?category=${encodeURIComponent(p.category)}">${esc(p.category)}</a> › ${esc(p.title)}</div>
+<div class="detail"><div><img src="${esc(p.image_url)}" alt="" onerror="this.style.display='none'"></div><div>
+<h1>${esc(p.title)}</h1><p class="meta">出品者: <a href="#">${esc(seller.username)}</a></p><hr>
+<div class="price"><small>開始価格</small> ${yen(p.start_price)}</div>
+${st === 'ended' ? '' : '<p><span class="tag blind">🔒 封印中</span> <span class="meta">他の人の入札額は終了まで誰にも見えません</span></p>'}
+<div class="buybox">${st === 'live' ? `<div class="meta">残り時間</div>${timer(p.end_at, true).replace('class="timer"', 'class="timer big"')}<hr>` : ''}${box}</div>
+<table class="info"><tr><th>入札者数</th><td>${n}人</td></tr><tr><th>終了日時</th><td>${fmtDate(p.end_at)}</td></tr>
+<tr><th>商品の状態</th><td>${esc(p.item_condition)}</td></tr>${p.brand ? `<tr><th>ブランド</th><td>${esc(p.brand)}</td></tr>` : ''}
+<tr><th>カテゴリ</th><td>${esc(p.category)}</td></tr><tr><th>発送方法</th><td>${esc(p.shipping_method)}</td></tr>
+<tr><th>発送元</th><td>${esc(p.ship_from)}</td></tr><tr><th>送料</th><td>${esc(p.shipping_payer)}</td></tr></table>
+<h3>商品説明</h3><p>${esc(p.description).replace(/\n/g, '<br>')}</p></div></div>`;
 }
 
 route('GET', /^\/auction\/(\d+)$/, ({ user, m, query }) => {
