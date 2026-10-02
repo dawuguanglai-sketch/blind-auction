@@ -37,6 +37,21 @@ CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 INSERT OR IGNORE INTO settings VALUES('seller_fee_percent','5');
 `);
 
+try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0'); } catch { /* 追加済み */ }
+db.exec('CREATE TABLE IF NOT EXISTS admin_logs(id INTEGER PRIMARY KEY, admin_id INTEGER NOT NULL, action TEXT NOT NULL, created_at INTEGER NOT NULL)');
+// 管理者の付与: 環境変数 ADMIN_EMAILS=a@x.com,b@y.com か、 node server.js make-admin メールアドレス
+const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+if (process.argv[2] === 'make-admin') adminEmails.push(String(process.argv[3] || '').toLowerCase());
+for (const em of adminEmails) {
+  const r = db.prepare('UPDATE users SET is_admin=1 WHERE lower(email)=?').run(em);
+  console.log(r.changes ? `管理者に設定しました: ${em}` : `該当するユーザーがいません: ${em}`);
+}
+if (process.argv[2] === 'make-admin') process.exit(0);
+for (const col of ['google_sub', 'apple_sub']) {
+  try { db.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`); } catch { /* 追加済み */ }
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_${col} ON users(${col})`);
+}
+
 const CATEGORIES = ['本・雑誌', '家電', 'ファッション', 'ホビー', 'コレクション', 'スポーツ', 'その他'];
 const CONDITIONS = ['新品', '未使用に近い', '目立った傷なし', 'やや傷あり', '傷あり'];
 const TX_STEPS = {
@@ -59,6 +74,7 @@ function hashPw(pw) {
   return salt + ':' + crypto.scryptSync(pw, salt, 64).toString('hex');
 }
 function checkPw(pw, stored) {
+  if (!stored.includes(':')) return false; // 外部ログイン専用アカウント(パスワードなし)
   const [salt, h] = stored.split(':');
   const a = Buffer.from(h, 'hex'), b = crypto.scryptSync(pw, salt, 64);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -182,7 +198,7 @@ function page(user, title, body, opts = {}) {
 <style>${CSS}</style></head><body>
 <div class="top"><a class="logo" href="/"><i>札</i>一発入札</a>
 <form class="sbar" action="/search"><select name="category"><option value="">すべて</option>${CATEGORIES.map((c) => `<option>${c}</option>`).join('')}</select><input name="q" placeholder="さがす…"><button>検索</button></form>
-<div class="acts">${user ? `<a href="/mypage">${esc(user.username)}${unread ? ` 🔔${unread}` : ''}</a><a href="/logout">ログアウト</a><a class="cta" href="/sell">出品する</a>`
+<div class="acts">${user ? `${user.is_admin ? '<a href="/admin">管理</a>' : ''}<a href="/mypage">${esc(user.username)}${unread ? ` 🔔${unread}` : ''}</a><a href="/logout">ログアウト</a><a class="cta" href="/sell">出品する</a>`
       : '<a href="/login">ログイン</a><a class="cta" href="/register">会員登録</a>'}</div></div>
 <nav class="sub"><a href="/search?sort=ending">⏰ 終了間近</a><a href="/search?sort=new">新着</a><a href="/search?sort=bidders">人気</a>${CATEGORIES.map((c) => `<a href="/search?category=${encodeURIComponent(c)}">${c}</a>`).join('')}<a href="/search?ended=1">落札結果</a></nav>
 <main>${opts.flash ? `<div class="${opts.flashType || 'err'}">${esc(opts.flash)}</div>` : ''}${body}</main>
@@ -252,7 +268,7 @@ route('GET', /^\/search$/, ({ user, query }) => {
   if (query.condition) { w.push('item_condition=?'); p.push(query.condition); }
   if (+query.min) { w.push('start_price>=?'); p.push(+query.min); }
   if (+query.max) { w.push('start_price<=?'); p.push(+query.max); }
-  if (query.ended === '1') w.push("status<>'active'"); else { w.push("status='active' AND end_at>?"); p.push(t); }
+  if (query.ended === '1') w.push("status IN ('ended','ended_nobid')"); else { w.push("status='active' AND end_at>?"); p.push(t); }
   // 「現在価格順」は存在しない (§23)
   const sorts = {
     new: ['新着順', 'created_at DESC'], ending: ['終了間近', 'end_at ASC'],
@@ -283,7 +299,8 @@ function auctionBody(user, p, flash) {
   if (st === 'ended') {
     // 終了後に公開するのは落札価格のみ (§14)。他人の入札額は一切送らない。
     const tx = one('SELECT * FROM transactions WHERE auction_id=?', p.id);
-    if (!tx) box = '<p><b>オークション終了</b><br>入札はありませんでした。</p>';
+    if (p.status === 'removed') box = '<p><b>この商品は運営により削除されました。</b></p>';
+    else if (!tx) box = '<p><b>オークション終了</b><br>入札はありませんでした。</p>';
     else {
       const w = one('SELECT username FROM users WHERE id=?', tx.buyer_id);
       const isWin = user && user.id === tx.buyer_id;
@@ -371,7 +388,7 @@ const regForm = (v = {}) => `<h1>会員登録</h1><form method="post" class="pan
 <label>パスワード(8文字以上)</label><input name="password" type="password" required minlength="8">
 <label>電話番号</label><input name="phone" required value="${esc(v.phone)}">
 <label><input type="checkbox" name="terms" value="1" style="width:auto" required> 利用規約に同意する</label><p></p><button>登録する</button></form>`;
-route('GET', /^\/register$/, ({ user }) => page(user, '会員登録', regForm()));
+route('GET', /^\/register$/, ({ user }) => page(user, '会員登録', regForm() + socialButtons('')));
 route('POST', /^\/register$/, ({ user, form, res }) => {
   const { username = '', email = '', password = '', phone = '', terms } = form;
   let err = null;
@@ -387,7 +404,7 @@ route('POST', /^\/register$/, ({ user, form, res }) => {
 });
 route('GET', /^\/login$/, ({ user, query }) => page(user, 'ログイン', `<h1>ログイン</h1><form method="post" class="panel f">
 <input type="hidden" name="next" value="${esc(query.next)}"><label>メールアドレス</label><input name="email" type="email" required>
-<label>パスワード</label><input name="password" type="password" required><p></p><button>ログイン</button> <a href="/register">会員登録</a></form>`));
+<label>パスワード</label><input name="password" type="password" required><p></p><button>ログイン</button> <a href="/register">会員登録</a></form>${socialButtons(query.next)}`));
 route('POST', /^\/login$/, ({ user, form }) => {
   const u = one('SELECT * FROM users WHERE email=?', form.email || '');
   if (!u || u.status !== 'active' || !checkPw(form.password || '', u.password_hash)) {
@@ -400,6 +417,87 @@ function login(uid, to) {
   run('INSERT INTO sessions VALUES(?,?,?)', tok, uid, now());
   return redirect(to, { 'Set-Cookie': `sid=${tok}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000` });
 }
+// ---------- 外部ログイン (Google / Apple, OpenID Connect) ----------
+// 必要な環境変数: BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+//   APPLE_CLIENT_ID(Services ID), APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY_FILE(.p8)
+const BASE_URL = (process.env.BASE_URL || 'http://localhost:' + PORT).replace(/\/$/, '');
+const E = process.env;
+const PROVIDERS = {
+  google: {
+    label: 'Googleでログイン', enabled: !!(E.GOOGLE_CLIENT_ID && E.GOOGLE_CLIENT_SECRET),
+    auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token',
+    clientId: E.GOOGLE_CLIENT_ID, scope: 'openid email profile', issuers: ['https://accounts.google.com', 'accounts.google.com'],
+    secret: () => E.GOOGLE_CLIENT_SECRET,
+  },
+  apple: {
+    label: 'Appleでサインイン', enabled: !!(E.APPLE_CLIENT_ID && E.APPLE_TEAM_ID && E.APPLE_KEY_ID && E.APPLE_PRIVATE_KEY_FILE),
+    auth: 'https://appleid.apple.com/auth/authorize', token: 'https://appleid.apple.com/auth/token',
+    clientId: E.APPLE_CLIENT_ID, scope: 'name email', issuers: ['https://appleid.apple.com'], extra: { response_mode: 'form_post' },
+    secret: () => { // Apple の client_secret は .p8 鍵で署名した ES256 の JWT
+      const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      const t = Math.floor(Date.now() / 1000);
+      const data = b64({ alg: 'ES256', kid: E.APPLE_KEY_ID }) + '.' + b64({ iss: E.APPLE_TEAM_ID, iat: t, exp: t + 300, aud: 'https://appleid.apple.com', sub: E.APPLE_CLIENT_ID });
+      const key = require('node:fs').readFileSync(E.APPLE_PRIVATE_KEY_FILE, 'utf8');
+      return data + '.' + crypto.sign('sha256', Buffer.from(data), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    },
+  },
+};
+const oauthStates = new Map(); // state -> {provider, nonce, next, exp} (Apple は cross-site POST で戻るため Cookie ではなくサーバーに保持)
+const safeNext = (n) => (n && n.startsWith('/') && !n.startsWith('//') ? n : '/mypage');
+const SOCIAL_STYLE = { google: 'background:#fff;color:#17130f', apple: 'background:#17130f;color:#fff' };
+const SOCIAL_MARK = { google: '<b style="color:#4285f4">G</b>', apple: '' };
+const socialButtons = (next) => // 未設定でも表示する(押すと「準備中」ページへ)
+  `<div class="panel"><p class="meta" style="margin-top:0">ほかのアカウントでログイン</p>${Object.entries(PROVIDERS).map(([k, p]) =>
+    `<p><a class="btn" style="width:100%;text-align:center;${SOCIAL_STYLE[k]}" href="/auth/${k}?next=${encodeURIComponent(next || '')}">${SOCIAL_MARK[k]} ${p.label}</a></p>`).join('')}</div>`;
+route('GET', /^\/auth\/(google|apple)$/, ({ m, query }) => {
+  const p = PROVIDERS[m[1]];
+  if (!p.enabled) return [503, page(null, '準備中', `<div class="panel"><h2>${p.label}は準備中です</h2><p>現在このログイン方法は設定されていません。メールアドレスでログインしてください。</p><a class="btn" href="/login">ログイン画面へ戻る</a></div>`)];
+  const state = crypto.randomBytes(24).toString('hex'), nonce = crypto.randomBytes(16).toString('hex');
+  for (const [k, v] of oauthStates) if (v.exp < now()) oauthStates.delete(k);
+  oauthStates.set(state, { provider: m[1], nonce, next: safeNext(query.next), exp: now() + 10 * 60e3 });
+  const q = new URLSearchParams({ client_id: p.clientId, redirect_uri: `${BASE_URL}/auth/${m[1]}/callback`, response_type: 'code', scope: p.scope, state, nonce, ...p.extra });
+  return redirect(p.auth + '?' + q);
+});
+async function oauthCallback({ user, m, query, form }) {
+  const name = m[1], p = PROVIDERS[name], params = name === 'apple' ? form : query;
+  const st = oauthStates.get(params.state);
+  oauthStates.delete(params.state);
+  const fail = (msg) => page(user, 'ログイン', `<h1>ログインできませんでした</h1><p><a href="/login">ログイン画面へ戻る</a></p>`, { flash: msg });
+  if (!p.enabled || !st || st.provider !== name || st.exp < now()) return fail('認証の有効期限が切れました。もう一度お試しください。');
+  if (!params.code) return fail('外部ログインがキャンセルされました。');
+  const r = await fetch(p.token, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code: params.code, client_id: p.clientId, client_secret: p.secret(), redirect_uri: `${BASE_URL}/auth/${name}/callback` }),
+  });
+  const tok = await r.json();
+  if (!r.ok || !tok.id_token) return fail('外部ログインに失敗しました。');
+  // id_token は TLS 経由でトークンエンドポイントから直接受け取ったものなので、署名ではなくクレームを検証する (OIDC Core 3.1.3.7)
+  const c = JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString());
+  if (!p.issuers.includes(c.iss) || c.aud !== p.clientId || c.exp * 1000 < now() || c.nonce !== st.nonce || !c.sub) return fail('認証情報を確認できませんでした。');
+  const col = name + '_sub';
+  let u = one(`SELECT * FROM users WHERE ${col}=?`, c.sub);
+  if (!u && c.email && (c.email_verified === true || c.email_verified === 'true')) { // 確認済みメールが同じ既存アカウントに紐づける
+    u = one('SELECT * FROM users WHERE email=?', c.email.toLowerCase());
+    if (u && !u[col]) run(`UPDATE users SET ${col}=? WHERE id=?`, c.sub, u.id);
+    else if (u) u = null;
+  }
+  if (!u) {
+    let hint = '';
+    try { const n = JSON.parse(params.user || '{}').name; hint = [n && n.lastName, n && n.firstName].filter(Boolean).join(' '); } catch { /* 初回のみ付く */ }
+    const base = (c.name || hint || (c.email || '').split('@')[0] || 'user').replace(/\s+/g, '').slice(0, 24) || 'user';
+    let username = base;
+    while (one('SELECT 1 x FROM users WHERE username=?', username)) username = base + Math.floor(Math.random() * 10000);
+    let email = (c.email || `${name}-${c.sub}@social.invalid`).toLowerCase();
+    if (one('SELECT 1 x FROM users WHERE email=?', email)) email = `${name}-${c.sub}@social.invalid`; // 未確認メールが既存と重複
+    const ins = run(`INSERT INTO users(username,email,password_hash,phone,created_at,${col}) VALUES(?,?,?,?,?,?)`, username, email, '!', '', now(), c.sub);
+    u = one('SELECT * FROM users WHERE id=?', Number(ins.lastInsertRowid));
+  }
+  if (u.status !== 'active') return fail('このアカウントは利用できません。');
+  return login(u.id, st.next);
+}
+route('GET', /^\/auth\/(google|apple)\/callback$/, oauthCallback);
+route('POST', /^\/auth\/apple\/callback$/, oauthCallback);
+
 route('GET', /^\/logout$/, ({ req }) => {
   const tok = parseCookies(req.headers.cookie).sid;
   if (tok) run('DELETE FROM sessions WHERE token=?', tok);
@@ -452,7 +550,7 @@ route('GET', /^\/mypage$/, ({ user }) => {
   if (!user) return redirect('/login?next=/mypage');
   const bidding = all(`SELECT p.*, b.amount my FROM bids b JOIN products p ON p.id=b.auction_id WHERE b.user_id=? ORDER BY p.end_at DESC`, user.id);
   const sell = all('SELECT * FROM products WHERE seller_id=? ORDER BY created_at DESC', user.id);
-  const txs = all(`SELECT t.*, p.title FROM transactions t JOIN products p ON p.id=t.auction_id WHERE buyer_id=? OR seller_id=? ORDER BY t.created_at DESC`, user.id, user.id);
+  const txs = all(`SELECT t.*, p.title FROM transactions t JOIN products p ON p.id=t.auction_id WHERE t.buyer_id=? OR t.seller_id=? ORDER BY t.created_at DESC`, user.id, user.id);
   const notes = all('SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 20', user.id);
   const lbl = (p) => ({ live: '入札受付中', scheduled: '開始前', ended: '終了' }[statusOf(p)]);
   const outcome = (p) => {
@@ -494,6 +592,97 @@ route('POST', /^\/transaction\/(\d+)\/(pay|ship|receive)$/, ({ user, m }) => {
   notify(flow[3], flow[4], '/transaction/' + t.id);
   return redirect('/transaction/' + t.id);
 });
+
+// ---------- 管理画面 (§3 管理者, §29 不正監視) ----------
+const adm = (fn) => (ctx) => (ctx.user && ctx.user.is_admin ? fn(ctx) : [403, page(ctx.user, '403', '<div class="err">管理者のみアクセスできます。</div>')]);
+const logAdmin = (uid, action) => run('INSERT INTO admin_logs(admin_id,action,created_at) VALUES(?,?,?)', uid, action, now());
+const back = (to, msg) => redirect(to + (to.includes('?') ? '&' : '?') + 'msg=' + encodeURIComponent(msg));
+function adminPage(user, title, body, msg) {
+  const tabs = [['/admin', '概要'], ['/admin/users', 'ユーザー'], ['/admin/products', '商品・オークション'], ['/admin/transactions', '取引'], ['/admin/settings', '設定']];
+  return page(user, '管理 - ' + title, `<h1>管理画面</h1><nav class="sub" style="padding-left:0">${tabs.map(([h, l]) => `<a href="${h}">${l}</a>`).join('')}</nav>
+${msg ? `<div class="ok">${esc(msg)}</div>` : ''}${body}`);
+}
+const STATUS_JA = { active: '開催中', ended: '終了(落札)', ended_nobid: '終了(入札なし)', removed: '削除' };
+
+route('GET', /^\/admin$/, adm(({ user, query }) => {
+  const n = (sql, ...p) => one(sql, ...p).c;
+  const sales = one('SELECT COALESCE(SUM(amount),0) a, COALESCE(SUM(fee),0) f FROM transactions');
+  // 不正の疑い: 同じ電話番号を使う複数アカウント / 自分と同じ電話番号の出品者の商品に入札
+  const dupPhones = all("SELECT phone, COUNT(*) c, GROUP_CONCAT(username, ', ') names FROM users WHERE phone<>'' GROUP BY phone HAVING c>1");
+  const suspicious = all(`SELECT b.auction_id, p.title, bu.username bidder, se.username seller FROM bids b JOIN products p ON p.id=b.auction_id
+    JOIN users bu ON bu.id=b.user_id JOIN users se ON se.id=p.seller_id WHERE bu.phone<>'' AND bu.phone=se.phone AND bu.id<>se.id`);
+  const cancel = all(`SELECT u.username, COUNT(*) c FROM transactions t JOIN users u ON u.id=t.buyer_id WHERE t.status='payment_pending' AND t.created_at<? GROUP BY u.id HAVING c>=1`, now() - 3 * 864e5);
+  const logs = all('SELECT l.*, u.username FROM admin_logs l JOIN users u ON u.id=l.admin_id ORDER BY l.id DESC LIMIT 10');
+  const stat = (l, v) => `<div class="panel" style="margin:0"><div class="meta">${l}</div><div class="price">${v}</div></div>`;
+  const body = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-bottom:1.2rem">
+${stat('ユーザー数', n('SELECT COUNT(*) c FROM users'))}${stat('開催中', n("SELECT COUNT(*) c FROM products WHERE status='active' AND end_at>?", now()))}
+${stat('総入札数', n('SELECT COUNT(*) c FROM bids'))}${stat('成約数', n('SELECT COUNT(*) c FROM transactions'))}
+${stat('総取引額', yen(sales.a))}${stat('手数料収入', yen(sales.f))}</div>
+<div class="panel"><h3>⚠ 不正チェック</h3>
+<p><b>同じ電話番号の複数アカウント</b></p>${dupPhones.length ? '<ul>' + dupPhones.map((d) => `<li>${esc(d.phone)}: ${esc(d.names)}</li>`).join('') + '</ul>' : '<p class="meta">なし</p>'}
+<p><b>出品者と同じ電話番号のユーザーの入札</b></p>${suspicious.length ? '<ul>' + suspicious.map((s) => `<li><a href="/auction/${s.auction_id}">${esc(s.title)}</a>: 入札者 ${esc(s.bidder)} / 出品者 ${esc(s.seller)}</li>`).join('') + '</ul>' : '<p class="meta">なし</p>'}
+<p><b>落札後3日以上、支払いがない購入者</b></p>${cancel.length ? '<ul>' + cancel.map((c) => `<li>${esc(c.username)}(${c.c}件)</li>`).join('') + '</ul>' : '<p class="meta">なし</p>'}</div>
+<div class="panel"><h3>操作ログ</h3>${logs.length ? '<table>' + logs.map((l) => `<tr><td>${fmtDate(l.created_at)}</td><td>${esc(l.username)}</td><td>${esc(l.action)}</td></tr>`).join('') + '</table>' : '<p class="meta">なし</p>'}</div>`;
+  return adminPage(user, '概要', body, query.msg);
+}));
+
+route('GET', /^\/admin\/users$/, adm(({ user, query }) => {
+  const l = '%' + (query.q || '') + '%';
+  const rows = all(`SELECT u.*, (SELECT COUNT(*) FROM bids WHERE user_id=u.id) bids, (SELECT COUNT(*) FROM products WHERE seller_id=u.id) items
+    FROM users u WHERE u.username LIKE ? OR u.email LIKE ? ORDER BY u.id DESC LIMIT 200`, l, l);
+  const body = `<form class="sbar" style="max-width:420px;margin-bottom:1rem" action="/admin/users"><input name="q" placeholder="ユーザー名・メール" value="${esc(query.q)}"><button>検索</button></form>
+<div class="panel" style="overflow-x:auto"><table><tr><th>ID</th><th>ユーザー名</th><th>メール</th><th>電話</th><th>入札</th><th>出品</th><th>登録日</th><th>状態</th><th></th></tr>
+${rows.map((u) => `<tr><td>${u.id}</td><td>${esc(u.username)}${u.is_admin ? ' <span class="tag">管理者</span>' : ''}${u.google_sub ? ' <span class="meta">G</span>' : ''}${u.apple_sub ? ' <span class="meta">A</span>' : ''}</td><td>${esc(u.email)}</td><td>${esc(u.phone)}</td><td>${u.bids}</td><td>${u.items}</td><td>${fmtDate(u.created_at)}</td>
+<td>${u.status === 'active' ? '有効' : '<span class="tag blind">停止中</span>'}</td><td>${u.is_admin ? '' : `<form method="post" action="/admin/users/${u.id}/${u.status === 'active' ? 'suspend' : 'activate'}" onsubmit="return confirm('${u.status === 'active' ? '利用を停止' : '停止を解除'}しますか？')"><button class="sec">${u.status === 'active' ? '停止' : '解除'}</button></form>`}</td></tr>`).join('')}</table></div>`;
+  return adminPage(user, 'ユーザー', body, query.msg);
+}));
+route('POST', /^\/admin\/users\/(\d+)\/(suspend|activate)$/, adm(({ user, m }) => {
+  const u = one('SELECT * FROM users WHERE id=?', +m[1]);
+  if (!u || u.is_admin) return back('/admin/users', '操作できないユーザーです。');
+  const sus = m[2] === 'suspend';
+  run('UPDATE users SET status=? WHERE id=?', sus ? 'suspended' : 'active', u.id);
+  if (sus) run('DELETE FROM sessions WHERE user_id=?', u.id);
+  logAdmin(user.id, `${u.username}(#${u.id}) を${sus ? '停止' : '停止解除'}`);
+  return back('/admin/users', `${u.username} を${sus ? '停止' : '停止解除'}しました。`);
+}));
+
+route('GET', /^\/admin\/products$/, adm(({ user, query }) => {
+  const rows = all(`SELECT p.*, u.username seller, (SELECT COUNT(*) FROM bids WHERE auction_id=p.id) n FROM products p JOIN users u ON u.id=p.seller_id ORDER BY p.id DESC LIMIT 200`);
+  const body = `<div class="panel" style="overflow-x:auto"><table><tr><th>ID</th><th>商品</th><th>出品者</th><th>開始価格</th><th>入札</th><th>終了日時</th><th>状態</th><th></th></tr>
+${rows.map((p) => `<tr><td>${p.id}</td><td><a href="/auction/${p.id}">${esc(p.title)}</a></td><td>${esc(p.seller)}</td><td>${yen(p.start_price)}</td><td>${p.n}</td><td>${fmtDate(p.end_at)}</td><td>${STATUS_JA[p.status] || p.status}</td>
+<td>${p.status === 'active' ? `<form method="post" action="/admin/products/${p.id}/remove" onsubmit="return confirm('この商品を削除し、オークションを中止しますか？')"><button class="sec">削除</button></form>` : ''}</td></tr>`).join('')}</table></div>`;
+  return adminPage(user, '商品', body, query.msg);
+}));
+route('POST', /^\/admin\/products\/(\d+)\/remove$/, adm(({ user, m }) => {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const p = one('SELECT * FROM products WHERE id=?', +m[1]);
+    if (!p || p.status !== 'active') { db.exec('ROLLBACK'); return back('/admin/products', '削除できない商品です。'); }
+    run("UPDATE products SET status='removed' WHERE id=?", p.id);
+    notify(p.seller_id, `「${p.title}」は運営により削除されました。`, null);
+    for (const b of all('SELECT user_id FROM bids WHERE auction_id=?', p.id)) notify(b.user_id, `「${p.title}」のオークションは中止されました。`, null);
+    logAdmin(user.id, `商品 #${p.id}「${p.title}」を削除`);
+    db.exec('COMMIT');
+    return back('/admin/products', '商品を削除しました。');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+}));
+
+route('GET', /^\/admin\/transactions$/, adm(({ user }) => {
+  const rows = all(`SELECT t.*, p.title, b.username buyer, s.username seller FROM transactions t JOIN products p ON p.id=t.auction_id
+    JOIN users b ON b.id=t.buyer_id JOIN users s ON s.id=t.seller_id ORDER BY t.id DESC LIMIT 200`);
+  return adminPage(user, '取引', `<div class="panel" style="overflow-x:auto"><table><tr><th>ID</th><th>商品</th><th>購入者</th><th>出品者</th><th>金額</th><th>手数料</th><th>状況</th><th>成立日時</th></tr>
+${rows.map((t) => `<tr><td>${t.id}</td><td>${esc(t.title)}</td><td>${esc(t.buyer)}</td><td>${esc(t.seller)}</td><td>${yen(t.amount)}</td><td>${yen(t.fee)}</td><td>${TX_STEPS[t.status]}</td><td>${fmtDate(t.created_at)}</td></tr>`).join('') || '<tr><td colspan=8 class="meta">なし</td></tr>'}</table></div>`);
+}));
+
+route('GET', /^\/admin\/settings$/, adm(({ user, query }) => adminPage(user, '設定', `<form method="post" class="panel f" style="max-width:420px">
+<label>販売手数料(%)</label><input name="fee" type="number" min="0" max="50" step="0.1" value="${getFee()}"><p class="meta">新しく成立する取引から適用されます。</p><button>保存</button></form>`, query.msg)));
+route('POST', /^\/admin\/settings$/, adm(({ user, form }) => {
+  const fee = Number(form.fee);
+  if (!(fee >= 0 && fee <= 50)) return back('/admin/settings', '手数料は0〜50で指定してください。');
+  run("UPDATE settings SET value=? WHERE key='seller_fee_percent'", String(fee));
+  logAdmin(user.id, `販売手数料を ${fee}% に変更`);
+  return back('/admin/settings', '保存しました。');
+}));
 
 function redirect(to, headers = {}) { return { redirect: to, headers }; }
 
